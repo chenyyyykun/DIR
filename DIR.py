@@ -33,7 +33,7 @@ class PatchShuffle(torch.nn.Module):
 
         indexes = [random_indexes(T) for _ in range(B)]
         forward_indexes = torch.as_tensor(np.stack([i[0] for i in indexes], axis=-1), dtype=torch.long).to(patches.device)
-        backward_indexes = torch.as_tensor(np.stack([i[1] for i in indexes], axis=-1), dtype=torch.long).to(patches.device)  #乱序后的编号
+        backward_indexes = torch.as_tensor(np.stack([i[1] for i in indexes], axis=-1), dtype=torch.long).to(patches.device)  
 
         patches = take_indexes(patches, forward_indexes)
         patches_1 = patches[:remain_T]
@@ -41,12 +41,12 @@ class PatchShuffle(torch.nn.Module):
 
         return patches_1,patches_2, forward_indexes, backward_indexes
 
-class DIR_Encoder(torch.nn.Module):
+class MAE_Encoder(torch.nn.Module):
     def __init__(self,
                  image_size=32,
                  patch_size=2,
                  emb_dim=192,
-                 num_layer=12,
+                 num_layer=8,
                  num_head=3,
                  mask_ratio=0.5,
                  ) -> None:
@@ -87,12 +87,12 @@ class DIR_Encoder(torch.nn.Module):
 
         return features_1, features_2, backward_indexes
 
-class DIR_Decoder(torch.nn.Module):
+class MAE_Decoder(torch.nn.Module):
     def __init__(self,
                  image_size=32,
                  patch_size=2,
                  emb_dim=192,
-                 num_layer=4,
+                 num_layer=2,
                  num_head=3,
                  ) -> None:
         super().__init__()
@@ -132,22 +132,22 @@ class DIR_Decoder(torch.nn.Module):
 
         return features
 
-class DIR_ViT(torch.nn.Module):
+class MAE_ViT(torch.nn.Module):
     def __init__(self,
                  image_size=32,
                  patch_size=2,
                  emb_dim=192,
-                 encoder_layer=12,
+                 encoder_layer=8,
                  encoder_head=3,
-                 decoder_layer=4,
+                 decoder_layer=2,
                  decoder_head=3,
                  mask_ratio=0.5,
                  ) -> None:
         super().__init__()
 
         self.patchify = torch.nn.Conv2d(3, emb_dim, patch_size, patch_size)
-        self.encoder = DIR_Encoder(image_size, patch_size, emb_dim, encoder_layer, encoder_head, mask_ratio)
-        self.decoder = DIR_Decoder(image_size, patch_size, emb_dim, decoder_layer, decoder_head)
+        self.encoder = MAE_Encoder(image_size, patch_size, emb_dim, encoder_layer, encoder_head, mask_ratio)
+        self.decoder = MAE_Decoder(image_size, patch_size, emb_dim, decoder_layer, decoder_head)
         # self.head = torch.nn.Linear(emb_dim, 3 * patch_size ** 2)
         self.patch2img = Rearrange('(h w) b (c p1 p2) -> b c (h p1) (w p2)', p1=patch_size, p2=patch_size, h=image_size//patch_size)
         self.img2patch = Rearrange('b c (h p1) (w p2) -> (h w) b (c p1 p2)',p1=patch_size, p2=patch_size, h=image_size//patch_size)
@@ -155,13 +155,15 @@ class DIR_ViT(torch.nn.Module):
         self.c2b = Rearrange('b c f ->c b f')
         self.conv1 = torch.nn.Conv1d(256,256,16,stride=16)
 
-    def Loss(self,img,pred):
-        loss = (pred - img)**2
+    def Loss(self,nat,pred):
+        nat_patches = self.img2patch(nat)
+        pred_patches = self.img2patch(pred)
+        loss = (pred_patches - nat_patches)**2
         loss = loss.mean(dim=-1)
         loss = loss.sum()/(loss.size()[0]*loss.size()[1])  #200:batch_size; 256:patches_num
         return loss
 
-    def forward(self, img_adv, img_nat):
+    def forward(self, img_adv):
         features_1, features_2, backward_indexes = self.encoder(img_adv)
         pred_1 = self.decoder(features_1,  backward_indexes)
         pred_2 = self.decoder(features_2,  backward_indexes)
@@ -172,10 +174,10 @@ class DIR_ViT(torch.nn.Module):
         pred_c2b = self.c2b(pred_conv)
         # pred = pred_c2b+pred_patches
         pred = pred_c2b
-        img_patches = self.img2patch(img_nat)
-        loss = self.Loss(img_patches,pred)
+        # img_patches = self.img2patch(img_nat)
+        # loss = self.Loss(img_patches,pred)
         img = self.patch2img(pred)
-        return img, loss
+        return img
 
 
 
