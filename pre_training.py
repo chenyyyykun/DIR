@@ -60,7 +60,7 @@ def main(args):
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lr_func, verbose=True)
 
     optim.zero_grad()
-    for e in range(290,args.total_epoch):
+    for e in range(args.total_epoch):
         model.train()
         losses = []
         losses_test = []
