@@ -1,0 +1,6 @@
+advertorch==0.2.4
+h5py==3.1.0
+timm==0.6.9
+torch==1.9.0+cu111
+torchvision==0.10.0
+tqdm==4.65.0
