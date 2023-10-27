@@ -14,7 +14,7 @@ from model import ResNet18
 import torch.nn as nn
 import torchvision.transforms as transforms
 
-from model_try import *
+from pretrain_model import *
 # from model import *
 
 def get_args_parser():
