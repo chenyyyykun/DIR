@@ -132,7 +132,7 @@ class MAE_Decoder(torch.nn.Module):
 
         return features
 
-class MAE_ViT(torch.nn.Module):
+class DIR_ViT(torch.nn.Module):
     def __init__(self,
                  image_size=32,
                  patch_size=2,
